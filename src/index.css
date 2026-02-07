@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@theme {
+    /* Strict User Palette */
+    --color-background: #FFFFFF;
+    --color-surface: #F3F3F3;
+    --color-primary: #111111;
+    --color-primary-foreground: #FFFFFF;
+
+    --color-secondary: #F3F3F3;
+    --color-secondary-foreground: #111111;
+
+    --color-accent: #111111;
+    /* accent is primary in this monochrome theme */
+    --color-accent-foreground: #FFFFFF;
+
+    --color-destructive: #DC2626;
+    /* Red-600 for visibility/report */
+    --color-destructive-foreground: #FFFFFF;
+
+    --color-border: #E5E5E5;
+    --color-input: #E5E5E5;
+    --color-ring: #111111;
+
+    --color-text-primary: #111111;
+    --color-text-secondary: #666666;
+
+    --color-on-glass: #111111;
+
+    /* Fonts */
+    --font-sans: "Inter", system-ui, sans-serif;
+
+    /* Shadows - adjusted for lighter theme */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Glassmorphism Utilities */
+.glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border);
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-delay-100 {
+    animation-delay: 100ms;
+}
+
+.animate-delay-200 {
+    animation-delay: 200ms;
+}
+
+.animate-delay-300 {
+    animation-delay: 300ms;
+}
+
+/* 
+  Utility classes to match the user's requested specific font families 
+  by mapping them to the correct font-weights of Inter.
+*/
+.font-sans,
+.font-Inter_400Regular {
+    font-family: "Inter", sans-serif;
+    font-weight: 400;
+}
+
+.font-medium,
+.font-Inter_500Medium {
+    font-family: "Inter", sans-serif;
+    font-weight: 500;
+}
+
+.font-semibold,
+.font-Inter_600SemiBold {
+    font-family: "Inter", sans-serif;
+    font-weight: 600;
+}
+
+.font-bold,
+.font-Inter_700Bold {
+    font-family: "Inter", sans-serif;
+    font-weight: 700;
+}
