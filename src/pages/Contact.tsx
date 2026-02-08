@@ -11,6 +11,7 @@ export const ContactPage: React.FC = () => {
     const location = useLocation();
     const { vehicleId } = location.state || {};
     const [vehicle, setVehicle] = useState<VehicleDetails | null>(null);
+    const [showEmergencyModal, setShowEmergencyModal] = useState(false);
 
     useEffect(() => {
         if (vehicleId) {
@@ -88,15 +89,17 @@ export const ContactPage: React.FC = () => {
                 </div>
 
                 <div className="pt-6 mt-6 border-t border-border/50 space-y-3">
-                    <Button
-                        fullWidth
-                        variant="destructive"
-                        className="justify-start pl-4 group transition-all duration-300 hover:shadow-red-200 hover:shadow-lg"
-                        leftIcon={<AlertTriangle size={18} className="group-hover:animate-bounce" />}
-                        onClick={() => navigate('/report')}
-                    >
-                        Report Issue
-                    </Button>
+                    {vehicle?.showEmergencyContact && vehicle?.emergencyContact && (
+                        <Button
+                            fullWidth
+                            variant="destructive"
+                            className="justify-start pl-4 group transition-all duration-300 hover:shadow-red-200 hover:shadow-lg"
+                            leftIcon={<AlertTriangle size={18} className="group-hover:animate-bounce" />}
+                            onClick={() => setShowEmergencyModal(true)}
+                        >
+                            Emergency Contact
+                        </Button>
+                    )}
 
                     <Button
                         fullWidth
@@ -113,6 +116,43 @@ export const ContactPage: React.FC = () => {
             <div className="text-center pb-2 pt-4">
                 <p className="text-[10px] text-text-secondary uppercase tracking-widest opacity-50">Secure Connection</p>
             </div>
+
+            {/* Emergency Modal */}
+            {showEmergencyModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl border-l-4 border-red-500">
+                        <div className="flex flex-col items-center text-center mb-6">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                                <AlertTriangle size={32} className="text-red-500" />
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-900">Emergency Call</h2>
+                            <p className="text-gray-600 mt-2 text-sm">
+                                This number is strictly for emergencies. Any misuse of this feature will lead to serious actions and account restrictions.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button
+                                fullWidth
+                                variant="ghost"
+                                onClick={() => setShowEmergencyModal(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                fullWidth
+                                variant="destructive"
+                                onClick={() => {
+                                    window.location.href = `tel:${vehicle?.emergencyContact}`;
+                                    setShowEmergencyModal(false);
+                                }}
+                            >
+                                Call Now
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </MobileLayout>
     );
 };

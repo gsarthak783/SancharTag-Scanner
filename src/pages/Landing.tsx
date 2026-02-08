@@ -29,8 +29,8 @@ export const LandingPage: React.FC = () => {
             VehicleService.getDetails(id)
                 .then(data => {
                     setVehicle(data);
-                    // Create interaction if data loaded and not already created in this session
-                    if (data && !interactionCreated.current) {
+                    // Create interaction if data loaded, active, and not already created in this session
+                    if (data && data.isActive && !interactionCreated.current) {
                         createInteraction(data);
                     }
                 })
@@ -100,6 +100,16 @@ export const LandingPage: React.FC = () => {
                     <div className="w-full h-32 glass rounded-2xl flex items-center justify-center animate-pulse">
                         <span className="text-text-secondary text-sm">Scanning vehicle...</span>
                     </div>
+                ) : vehicle && !vehicle.isActive ? (
+                    <div className="w-full bg-red-50 border border-red-100 rounded-2xl p-6 mb-8 text-center shadow-sm animate-fade-in">
+                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Shield className="w-8 h-8 text-red-500" />
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Tag Inactive</h2>
+                        <p className="text-gray-600 mb-4">
+                            This Sanchar Tag is currently inactive. Please contact the vehicle owner directly if possible.
+                        </p>
+                    </div>
                 ) : vehicle ? (
                     <div className="w-full glass-card rounded-2xl p-6 mb-8 text-left shadow-lg animate-fade-in animate-delay-200 transform transition-all hover:scale-[1.02]">
                         <div className="flex items-center justify-between mb-4 pb-4 border-b border-border/50">
@@ -156,10 +166,11 @@ export const LandingPage: React.FC = () => {
                     fullWidth
                     size="lg"
                     onClick={handleContinue}
-                    rightIcon={<ArrowRight size={20} />}
+                    rightIcon={vehicle?.isActive ? <ArrowRight size={20} /> : undefined}
+                    disabled={!vehicle?.isActive && !!vehicle}
                     className="shadow-lg shadow-primary/20"
                 >
-                    {vehicle ? 'Contact Owner' : 'Continue'}
+                    {loading ? 'Loading...' : vehicle && !vehicle.isActive ? 'Inactive Tag' : vehicle ? 'Contact Owner' : 'Continue'}
                 </Button>
             </div>
         </MobileLayout>

@@ -8,6 +8,9 @@ export interface VehicleDetails {
     notes: string;
     vehicleNumber: string;
     tagId: string;
+    emergencyContact?: string;
+    showEmergencyContact?: boolean;
+    isActive: boolean;
 }
 
 // Ensure this matches your local network IP if testing on device, or localhost for web
@@ -29,7 +32,10 @@ export const VehicleService = {
                     ownerName: vehicle.ownerName || 'Unknown Owner',
                     notes: vehicle.notes || '',
                     vehicleNumber: vehicle.vehicleNumber,
-                    tagId: vehicle.tagId
+                    tagId: vehicle.tagId,
+                    emergencyContact: vehicle.emergencyContact,
+                    showEmergencyContact: vehicle.showEmergencyContact,
+                    isActive: vehicle.isActive
                 };
             }
             return null;
