@@ -6,8 +6,8 @@ import { MobileLayout } from '../layouts/MobileLayout';
 import { InteractionService } from '../services/InteractionService';
 import axios from 'axios';
 
-const SOCKET_URL = 'https://sanchartag-server.vercel.app';
-const API_URL = 'https://sanchartag-server.vercel.app';
+const SOCKET_URL = 'https://sanchartag-server.onrender.com';
+const API_URL = 'https://sanchartag-server.onrender.com';
 
 const REPORT_CATEGORIES = [
     'Harassment',
