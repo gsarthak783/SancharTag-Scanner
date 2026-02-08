@@ -70,7 +70,15 @@ export const ChatPage: React.FC = () => {
                 if (response.data && response.data.length > 0) {
                     const interaction = response.data[0];
                     setMessages(interaction.messages || []);
-                    setChatStatus(interaction.status as 'active' | 'resolved' | 'reported');
+
+                    // If resolved but NO messages (first time opening after auto-resolve), set to active
+                    if (interaction.status === 'resolved' && (!interaction.messages || interaction.messages.length === 0)) {
+                        await InteractionService.updateInteraction(interactionId, { status: 'active', resolvedAt: null });
+                        setChatStatus('active');
+                        // Also update contactType to chat if needed, done below
+                    } else {
+                        setChatStatus(interaction.status as 'active' | 'resolved' | 'reported');
+                    }
                 }
             } catch (err) {
                 console.error('Failed to fetch interaction:', err);
@@ -89,6 +97,11 @@ export const ChatPage: React.FC = () => {
         });
 
         socket.on('session_ended', (data: { status: string }) => {
+            setChatStatus(data.status as 'active' | 'resolved' | 'reported');
+        });
+
+        socket.on('status_update', (data: { status: string }) => {
+            // Handle reactivation from server if needed
             setChatStatus(data.status as 'active' | 'resolved' | 'reported');
         });
 
