@@ -9,7 +9,7 @@ import Logo from '../assets/SancharTagLogo.png';
 export const ContactPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { vehicleId, interactionId } = location.state || {};
+    const { vehicleId } = location.state || {};
     const [vehicle, setVehicle] = useState<VehicleDetails | null>(null);
 
     useEffect(() => {
