@@ -1,26 +1,85 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Logo from '../assets/SancharTagLogo.png';
 import { ArrowRight, User, FileText, Car, Shield } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { MobileLayout } from '../layouts/MobileLayout';
 import { VehicleService, type VehicleDetails } from '../services/VehicleService';
+import { InteractionService } from '../services/InteractionService';
+import { FingerprintService } from '../services/FingerprintService';
+
+// Simple UUID generator if package not available
+const generateUUID = () => {
+    return 'xxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
 
 export const LandingPage: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const [vehicle, setVehicle] = useState<VehicleDetails | null>(null);
     const [loading, setLoading] = useState(false);
+    const interactionCreated = useRef(false);
 
     useEffect(() => {
         if (id) {
             setLoading(true);
             VehicleService.getDetails(id)
-                .then(data => setVehicle(data))
+                .then(data => {
+                    setVehicle(data);
+                    // Create interaction if data loaded and not already created in this session
+                    if (data && !interactionCreated.current) {
+                        createInteraction(data);
+                    }
+                })
                 .catch(console.error)
                 .finally(() => setLoading(false));
         }
     }, [id]);
+
+    const createInteraction = async (vehicleData: VehicleDetails) => {
+        try {
+            interactionCreated.current = true;
+
+            // Check if we already have an interaction for this session/vehicle to avoid dupes
+            // For now, let's create a new one every valid landing load as it implies a new "scan" intent
+            // Or store in sessionStorage to prevent refresh duplicates.
+            const existingId = sessionStorage.getItem(`interaction_${id}`);
+            if (existingId) {
+                console.log('Interaction already exists for this session:', existingId);
+                return;
+            }
+
+            // Fetch IP and Location using shared service
+            const scannerDetails = await FingerprintService.capture();
+
+            const interactionId = `int_${Date.now()}_${generateUUID().split('-')[0]}`;
+
+            await InteractionService.createInteraction({
+                interactionId,
+                vehicleId: vehicleData.vehicleId,
+                userId: vehicleData.userId,
+                type: 'Scan',
+                contactType: 'scan',
+                scanner: scannerDetails
+            });
+
+            console.log('Interaction created:', interactionId, 'Location:', scannerDetails.city);
+            sessionStorage.setItem(`interaction_${id}`, interactionId); // Persist for this session
+            localStorage.setItem('currentInteractionId', interactionId);
+
+        } catch (error) {
+            console.error('Failed to create interaction:', error);
+            interactionCreated.current = false; // Retry on failure?
+        }
+    };
+
+    const handleContinue = () => {
+        const interactionId = localStorage.getItem('currentInteractionId');
+        navigate('/login', { state: { vehicleId: id, interactionId: interactionId } });
+    };
 
     return (
         <MobileLayout className="p-6 justify-between">
@@ -96,7 +155,7 @@ export const LandingPage: React.FC = () => {
                 <Button
                     fullWidth
                     size="lg"
-                    onClick={() => navigate('/login', { state: { vehicleId: id } })}
+                    onClick={handleContinue}
                     rightIcon={<ArrowRight size={20} />}
                     className="shadow-lg shadow-primary/20"
                 >

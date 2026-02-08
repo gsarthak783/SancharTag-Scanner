@@ -5,10 +5,12 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PhoneInput } from '../components/ui/PhoneInput';
 import { MobileLayout } from '../layouts/MobileLayout';
+import { InteractionService } from '../services/InteractionService';
 
 export const LoginPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { vehicleId, interactionId } = location.state || {}; // Retrieve interactionId
     const [step, setStep] = useState<'phone' | 'otp'>('phone');
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
@@ -24,14 +26,31 @@ export const LoginPage: React.FC = () => {
         }, 1500);
     };
 
-    const handleVerifyOtp = () => {
+    const handleVerifyOtp = async () => {
         if (otp.length < 4) return;
         setIsLoading(true);
-        // Simulate API call
-        setTimeout(() => {
+
+        try {
+            // Simulate OTP verification API call
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // On success, update the interaction with the verified phone number
+            if (interactionId) {
+                await InteractionService.updateInteraction(interactionId, {
+                    'scanner.phoneNumber': phone,
+                    // Optionally update status or other fields
+                });
+            } else {
+                console.warn('No interactionId found during login. Skipping update.');
+            }
+
+            navigate('/contact', { state: { vehicleId, interactionId } });
+        } catch (error) {
+            console.error('Login failed:', error);
+            // Handle error (show toast etc)
+        } finally {
             setIsLoading(false);
-            navigate('/contact', { state: location.state });
-        }, 1500);
+        }
     };
 
     return (

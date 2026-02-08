@@ -1,67 +1,48 @@
 import axios from 'axios';
+import type { ScannerDetails } from './InteractionService';
 
-export interface UserFingerprint {
-    ip: string;
-    city: string;
-    region: string;
-    country: string;
-    userAgent: string;
-    platform: string;
-    language: string;
-    screenResolution: string;
-    timezone: string;
-    capturedAt: string;
-}
+const API_KEY = '739bb0b00840467583bef8704b03ff73';
+
+export type UserFingerprint = ScannerDetails;
 
 export const FingerprintService = {
-    getDeviceDetails: (): Partial<UserFingerprint> => {
-        return {
+    capture: async (): Promise<Partial<ScannerDetails>> => {
+        const details: Partial<ScannerDetails> = {
             userAgent: navigator.userAgent,
-            platform: navigator.platform,
-            language: navigator.language,
             screenResolution: `${window.screen.width}x${window.screen.height}`,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            capturedAt: new Date().toISOString(),
+            language: navigator.language,
+            platform: navigator.platform,
+            capturedAt: new Date(),
+            ip: '',
+            city: '',
+            region: '',
+            country: '',
+            isp: ''
         };
-    },
 
-    getNetworkDetails: async (): Promise<Partial<UserFingerprint>> => {
         try {
-            // Using a public IP API. In production, this might be handled by the backend 
-            // or a dedicated service to avoid rate limits and ensure reliability.
-            const response = await axios.get('https://ipapi.co/json/');
-            return {
-                ip: response.data.ip,
-                city: response.data.city,
-                region: response.data.region,
-                country: response.data.country_name,
-            };
+            console.log('FingerprintService: Fetching geolocation...');
+            // Single call to get IP and Location directly
+            // Using the standard endpoint which usually returns flat data, but handling the user's nested structure just in case
+            const response = await axios.get(`https://api.ipgeolocation.io/ipgeo?apiKey=${API_KEY}`);
+            const geoData = response.data;
+            console.log('FingerprintService: Geolocation fetched:', geoData);
+
+            details.ip = geoData.ip;
+
+            // Handle both flat (standard) and nested (user-reported) response structures
+            const location = geoData.location || geoData;
+
+            details.city = location.city;
+            details.region = location.state_prov || location.district || location.region;
+            details.country = location.country_name;
+            details.isp = geoData.isp || geoData.organization; // ISP usually at root or org
+
         } catch (error) {
-            console.error('Failed to fetch network details:', error);
-            return {
-                ip: 'unknown',
-                city: 'unknown',
-                region: 'unknown',
-                country: 'unknown',
-            };
+            console.error('FingerprintService: Error fetching fingerprint/location:', error);
+            // Return what we have (browser details) even if network calls fail
         }
-    },
 
-    capture: async (): Promise<UserFingerprint> => {
-        const deviceDetails = FingerprintService.getDeviceDetails();
-        const networkDetails = await FingerprintService.getNetworkDetails();
-
-        return {
-            ip: networkDetails.ip || 'unknown',
-            city: networkDetails.city || 'unknown',
-            region: networkDetails.region || 'unknown',
-            country: networkDetails.country || 'unknown',
-            userAgent: deviceDetails.userAgent || 'unknown',
-            platform: deviceDetails.platform || 'unknown',
-            language: deviceDetails.language || 'unknown',
-            screenResolution: deviceDetails.screenResolution || 'unknown',
-            timezone: deviceDetails.timezone || 'unknown',
-            capturedAt: deviceDetails.capturedAt || new Date().toISOString(),
-        };
+        return details;
     }
 };

@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 export interface VehicleDetails {
-    id: string;
+    id: string; // Internal/MongoDB ID or custom ID
+    vehicleId: string; // Explicit vehicleId from schema
+    userId: string; // Owner's User ID
     ownerName: string;
     notes: string;
     vehicleNumber: string;
@@ -9,7 +11,7 @@ export interface VehicleDetails {
 }
 
 // Ensure this matches your local network IP if testing on device, or localhost for web
-const API_URL = 'http://192.168.0.135:3000';
+const API_URL = 'http://192.168.0.135:5000';
 
 export const VehicleService = {
     getDetails: async (tagId: string): Promise<VehicleDetails | null> => {
@@ -21,7 +23,9 @@ export const VehicleService = {
             if (Array.isArray(vehicles) && vehicles.length > 0) {
                 const vehicle = vehicles[0];
                 return {
-                    id: vehicle.id,
+                    id: vehicle._id || vehicle.id,
+                    vehicleId: vehicle.vehicleId,
+                    userId: vehicle.userId,
                     ownerName: vehicle.ownerName || 'Unknown Owner',
                     notes: vehicle.notes || '',
                     vehicleNumber: vehicle.vehicleNumber,
