@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { PhoneInput } from '../components/ui/PhoneInput';
 import { MobileLayout } from '../layouts/MobileLayout';
 
 export const LoginPage: React.FC = () => {
@@ -66,14 +67,10 @@ export const LoginPage: React.FC = () => {
                             <label className="block text-sm font-semibold text-text-primary uppercase tracking-wider ml-1">
                                 Mobile Number
                             </label>
-                            <Input
-                                placeholder="98765 43210"
-                                type="tel"
+                            <PhoneInput
                                 value={phone}
-                                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                                leftIcon={<span className="text-text-primary font-bold text-lg">+91</span>}
-                                className="text-xl h-14 bg-surface border-transparent focus:border-text-primary focus:bg-background transition-all"
-                                autoFocus
+                                onChange={(phone) => setPhone(phone)}
+                                className="mb-2"
                             />
                         </div>
                     ) : (
