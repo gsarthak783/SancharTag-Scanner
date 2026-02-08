@@ -71,7 +71,16 @@ export const ContactPage: React.FC = () => {
                         variant="glass"
                         size="lg"
                         leftIcon={<MessageCircle size={20} />}
-                        onClick={() => alert(`Chatting with ${vehicle?.ownerName || 'Owner'}...`)}
+                        onClick={() => {
+                            const interactionId = localStorage.getItem('currentInteractionId');
+                            navigate('/chat', {
+                                state: {
+                                    interactionId,
+                                    vehicleId,
+                                    ownerName: vehicle?.ownerName
+                                }
+                            });
+                        }}
                         className="h-24 flex-col gap-2 text-base text-text-primary bg-white/80 border-white/50 hover:bg-white hover:-translate-y-1 transition-transform shadow-sm"
                     >
                         Chat
