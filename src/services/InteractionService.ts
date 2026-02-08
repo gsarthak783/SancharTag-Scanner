@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://192.168.0.135:5000';
+const API_URL = 'https://sanchartag-server.vercel.app';
 
 export interface ScannerDetails {
     userAgent?: string;
