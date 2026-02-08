@@ -11,7 +11,7 @@ export interface VehicleDetails {
 }
 
 // Ensure this matches your local network IP if testing on device, or localhost for web
-const API_URL = 'http://192.168.0.135:5000';
+const API_URL = 'https://sanchartag-server.vercel.app';
 
 export const VehicleService = {
     getDetails: async (tagId: string): Promise<VehicleDetails | null> => {
