@@ -8,6 +8,7 @@ interface CallModalProps {
     userId: string; // The owner's user ID to call
     ownerName: string;
     vehicleNumber?: string;
+    interactionId?: string | null;
     socketUrl: string; // 'https://sanchartag-server.onrender.com'
 }
 
@@ -18,7 +19,7 @@ const STUN_SERVERS = {
     ],
 };
 
-export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, ownerName, vehicleNumber, socketUrl }) => {
+export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, ownerName, vehicleNumber, interactionId, socketUrl }) => {
     const [callStatus, setCallStatus] = useState<'calling' | 'connected' | 'ended' | 'failed'>('calling');
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(false);
@@ -108,7 +109,8 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                     signalData: offer,
                     from: socketRef.current?.id,
                     name: 'Scanner',
-                    vehicleNumber
+                    vehicleNumber,
+                    interactionId
                 });
 
                 // 6. Listen for Answer
@@ -161,7 +163,7 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
         return () => {
             endCall();
         };
-    }, [isOpen, userId, socketUrl, vehicleNumber]);
+    }, [isOpen, userId, socketUrl, vehicleNumber, interactionId]);
 
     const endCall = (emit: boolean = true) => {
         // Cleanup Media
@@ -179,7 +181,7 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
         // Cleanup Socket
         if (socketRef.current) {
             if (emit) {
-                socketRef.current.emit('endCall', { to: userId });
+                socketRef.current.emit('endCall', { to: userId, interactionId });
             }
             socketRef.current.disconnect();
             socketRef.current = null;

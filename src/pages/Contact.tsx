@@ -162,6 +162,7 @@ export const ContactPage: React.FC = () => {
                 userId={vehicle?.userId || ''}
                 ownerName={vehicle?.ownerName || 'Owner'}
                 vehicleNumber={vehicle?.vehicleNumber}
+                interactionId={localStorage.getItem('currentInteractionId')}
                 socketUrl="https://sanchartag-server.onrender.com"
             />
         </MobileLayout>
