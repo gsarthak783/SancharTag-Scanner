@@ -45,11 +45,26 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                     transports: ['websocket', 'polling'],
                 });
 
-                socketRef.current.on('connect', () => {
-                    console.log('Socket connected for call');
-                    // We don't need to join a room per se, we just need to emit to the user
-                    // But maybe we should join our own room to receive answer? 
-                    // No, server emits to socket.id.
+                await new Promise<void>((resolve, reject) => {
+                    if (socketRef.current?.connected) {
+                        resolve();
+                        return;
+                    }
+
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Socket connection timeout'));
+                    }, 10000);
+
+                    socketRef.current?.once('connect', () => {
+                        clearTimeout(timeout);
+                        console.log('Socket connected for call, ID:', socketRef.current?.id);
+                        resolve();
+                    });
+
+                    socketRef.current?.once('connect_error', (err) => {
+                        clearTimeout(timeout);
+                        reject(err);
+                    });
                 });
 
                 // 3. Initialize Peer Connection
@@ -73,31 +88,23 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                 pc.onicecandidate = (event) => {
                     if (event.candidate && socketRef.current) {
                         socketRef.current.emit('iceCandidate', {
-                            to: userId, // Send to Owner (Wait, owner listens on their socket ID?) 
-                            // Issue: We emit to `userId` room on server for `callUser`. 
-                            // But for ICE, we need to send to the specific socket ID of the Owner.
-                            // The `callUser` payload sends `from: socket.id`.
-                            // The Owner will reply. 
+                            to: userId,
                             candidate: event.candidate,
                         });
                     }
                 };
 
-                // Note: The server ICE handler expects `to` to be a socket ID or room.
-                // If we send to `userId`, it broadcasts to all owner's capabilities? 
-                // That might cause loops if multiple devices?
-                // For now, let's assume `userId` works for ICE too as generic routing if the server supports it?
-                // Server code: `io.to(to).emit(...)`. `userId` is a room. It should work.
-
                 // 4. Create Offer
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
 
+                console.log('Emitting callUser with ID:', socketRef.current?.id);
+
                 // 5. Emit Call
                 socketRef.current.emit('callUser', {
-                    userToCall: userId, // This is the 'room' name for the owner
+                    userToCall: userId,
                     signalData: offer,
-                    from: socketRef.current.id,
+                    from: socketRef.current?.id,
                     name: 'Scanner',
                 });
 
@@ -128,10 +135,21 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                     setTimeout(onClose, 2000);
                 });
 
-            } catch (err) {
+                // Set status to calling after everything is ready
+                setCallStatus('calling');
+                setStatusMessage('Calling...');
+
+            } catch (err: any) {
                 console.error('Error starting call:', err);
                 setCallStatus('failed');
-                setStatusMessage('Failed to access microphone or connect.');
+
+                if (err.name === 'NotFoundError' || err.message?.includes('device not found')) {
+                    setStatusMessage('No microphone found. Please connect one.');
+                } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    setStatusMessage('Microphone permission denied. Please allow access.');
+                } else {
+                    setStatusMessage('Failed to access microphone or connect.');
+                }
             }
         };
 
@@ -193,7 +211,7 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
 
                 <h2 className="text-2xl font-bold text-text-primary mb-2 line-clamp-1">{ownerName}</h2>
                 <p className={`text-sm font-medium mb-8 ${callStatus === 'connected' ? 'text-green-500' :
-                        callStatus === 'failed' ? 'text-destructive' : 'text-text-secondary animate-pulse'
+                    callStatus === 'failed' ? 'text-destructive' : 'text-text-secondary animate-pulse'
                     }`}>
                     {statusMessage}
                 </p>
@@ -207,8 +225,8 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                         onClick={toggleMute}
                         disabled={callStatus !== 'connected'}
                         className={`p-4 rounded-full transition-all ${isMuted
-                                ? 'bg-white text-black hover:bg-gray-200'
-                                : 'bg-secondary text-text-primary hover:bg-secondary/80'
+                            ? 'bg-white text-black hover:bg-gray-200'
+                            : 'bg-secondary text-text-primary hover:bg-secondary/80'
                             } ${callStatus !== 'connected' ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
