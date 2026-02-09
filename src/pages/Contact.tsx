@@ -161,6 +161,7 @@ export const ContactPage: React.FC = () => {
                 onClose={() => setShowCallModal(false)}
                 userId={vehicle?.userId || ''}
                 ownerName={vehicle?.ownerName || 'Owner'}
+                vehicleNumber={vehicle?.vehicleNumber}
                 socketUrl="https://sanchartag-server.onrender.com"
             />
         </MobileLayout>

@@ -7,6 +7,7 @@ interface CallModalProps {
     onClose: () => void;
     userId: string; // The owner's user ID to call
     ownerName: string;
+    vehicleNumber?: string;
     socketUrl: string; // 'https://sanchartag-server.onrender.com'
 }
 
@@ -17,7 +18,7 @@ const STUN_SERVERS = {
     ],
 };
 
-export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, ownerName, socketUrl }) => {
+export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, ownerName, vehicleNumber, socketUrl }) => {
     const [callStatus, setCallStatus] = useState<'calling' | 'connected' | 'ended' | 'failed'>('calling');
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(false);
@@ -107,6 +108,7 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                     signalData: offer,
                     from: socketRef.current?.id,
                     name: 'Scanner',
+                    vehicleNumber
                 });
 
                 // 6. Listen for Answer
@@ -159,7 +161,7 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
         return () => {
             endCall();
         };
-    }, [isOpen, userId, socketUrl]);
+    }, [isOpen, userId, socketUrl, vehicleNumber]);
 
     const endCall = (emit: boolean = true) => {
         // Cleanup Media
@@ -253,7 +255,7 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
 
                 <h2 className="text-2xl font-bold text-text-primary mb-2 line-clamp-1 text-center">{ownerName}</h2>
                 <p className={`text-sm font-medium mb-10 ${callStatus === 'connected' ? 'text-green-500' :
-                        callStatus === 'failed' ? 'text-destructive' : 'text-text-secondary animate-pulse'
+                    callStatus === 'failed' ? 'text-destructive' : 'text-text-secondary animate-pulse'
                     }`}>
                     {statusMessage}
                 </p>
@@ -268,8 +270,8 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                         onClick={toggleSpeaker}
                         disabled={callStatus !== 'connected'}
                         className={`p-4 rounded-full transition-all duration-300 flex flex-col items-center gap-1 group ${isSpeakerOn
-                                ? 'bg-white text-black hover:bg-gray-200'
-                                : 'bg-secondary/80 text-text-primary hover:bg-secondary'
+                            ? 'bg-white text-black hover:bg-gray-200'
+                            : 'bg-secondary/80 text-text-primary hover:bg-secondary'
                             } ${callStatus !== 'connected' ? 'opacity-50 cursor-not-allowed' : ''}`}
                         title="Toggle Speaker"
                     >
@@ -281,8 +283,8 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                         onClick={toggleMute}
                         disabled={callStatus !== 'connected'}
                         className={`p-4 rounded-full transition-all duration-300 flex flex-col items-center gap-1 ${isMuted
-                                ? 'bg-white text-black hover:bg-gray-200'
-                                : 'bg-secondary/80 text-text-primary hover:bg-secondary'
+                            ? 'bg-white text-black hover:bg-gray-200'
+                            : 'bg-secondary/80 text-text-primary hover:bg-secondary'
                             } ${callStatus !== 'connected' ? 'opacity-50 cursor-not-allowed' : ''}`}
                         title="Toggle Mute"
                     >
