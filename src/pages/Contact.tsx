@@ -4,6 +4,7 @@ import { Phone, MessageCircle, AlertTriangle, LogOut, Car } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { MobileLayout } from '../layouts/MobileLayout';
 import { VehicleService, type VehicleDetails } from '../services/VehicleService';
+import { CallModal } from '../components/CallModal';
 import Logo from '../assets/SancharTagLogo.png';
 
 export const ContactPage: React.FC = () => {
@@ -12,6 +13,7 @@ export const ContactPage: React.FC = () => {
     const { vehicleId } = location.state || {};
     const [vehicle, setVehicle] = useState<VehicleDetails | null>(null);
     const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+    const [showCallModal, setShowCallModal] = useState(false);
 
     useEffect(() => {
         if (vehicleId) {
@@ -62,7 +64,7 @@ export const ContactPage: React.FC = () => {
                         variant="primary"
                         size="lg"
                         leftIcon={<Phone size={20} />}
-                        onClick={() => alert(`Calling ${vehicle?.ownerName || 'Owner'}...`)}
+                        onClick={() => setShowCallModal(true)}
                         className="h-24 flex-col gap-2 text-base shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform"
                     >
                         Call
@@ -153,6 +155,14 @@ export const ContactPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <CallModal
+                isOpen={showCallModal}
+                onClose={() => setShowCallModal(false)}
+                userId={vehicle?.userId || ''}
+                ownerName={vehicle?.ownerName || 'Owner'}
+                socketUrl="https://sanchartag-server.onrender.com"
+            />
         </MobileLayout>
     );
 };
