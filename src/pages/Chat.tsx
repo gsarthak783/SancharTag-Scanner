@@ -24,6 +24,7 @@ interface Message {
     messageId: string;
     senderId: string;
     text: string;
+    type?: 'text' | 'call';
     timestamp: Date;
     isRead: boolean;
 }
@@ -246,24 +247,36 @@ export const ChatPage: React.FC = () => {
                         <p className="text-xs mt-1">Start the conversation!</p>
                     </div>
                 )}
-                {messages.map((msg) => (
-                    <div
-                        key={msg.messageId}
-                        className={`flex ${msg.senderId === 'scanner' ? 'justify-end' : 'justify-start'}`}
-                    >
+                {messages.map((msg) => {
+                    const isCall = msg.type === 'call';
+                    return (
                         <div
-                            className={`max-w-[75%] px-4 py-2.5 rounded-2xl shadow-sm ${msg.senderId === 'scanner'
-                                ? 'bg-primary text-white rounded-br-md'
-                                : 'bg-white text-text-primary border border-border/50 rounded-bl-md'
-                                }`}
+                            key={msg.messageId}
+                            className={`flex ${msg.senderId === 'scanner' && !isCall ? 'justify-end' : 'justify-center'} ${isCall ? 'my-4' : ''}`}
                         >
-                            <p className="text-sm leading-relaxed">{msg.text}</p>
-                            <p className={`text-[10px] mt-1 ${msg.senderId === 'scanner' ? 'text-white/70' : 'text-text-secondary'}`}>
-                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
+                            {isCall ? (
+                                <div className="flex items-center gap-2 bg-gray-100 text-gray-600 px-4 py-2 rounded-full text-xs font-medium">
+                                    <Phone size={14} />
+                                    <span>{msg.text}</span>
+                                    <span className="text-gray-400">•</span>
+                                    <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                            ) : (
+                                <div
+                                    className={`max-w-[75%] px-4 py-2.5 rounded-2xl shadow-sm ${msg.senderId === 'scanner'
+                                        ? 'bg-primary text-white rounded-br-md'
+                                        : 'bg-white text-text-primary border border-border/50 rounded-bl-md'
+                                        }`}
+                                >
+                                    <p className="text-sm leading-relaxed">{msg.text}</p>
+                                    <p className={`text-[10px] mt-1 ${msg.senderId === 'scanner' ? 'text-white/70' : 'text-text-secondary'}`}>
+                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                </div>
+                            )}
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
                 <div ref={messagesEndRef} />
 
                 {/* Status Banner */}
