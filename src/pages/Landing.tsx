@@ -150,6 +150,19 @@ export const LandingPage: React.FC = () => {
                     </div>
                 )}
 
+                 <div className="mb-8">
+                <Button
+                    fullWidth
+                    size="lg"
+                    onClick={handleContinue}
+                    rightIcon={vehicle?.isActive ? <ArrowRight size={20} /> : undefined}
+                    disabled={!vehicle?.isActive && !!vehicle}
+                    className="shadow-lg shadow-primary/20"
+                >
+                    {loading ? 'Loading...' : vehicle && !vehicle.isActive ? 'Inactive Tag' : vehicle ? 'Contact Owner' : 'Continue'}
+                </Button>
+                </div>
+
                 <div className="mt-autow-full">
                     <div className="flex items-start gap-3 p-4 rounded-xl bg-slate-100/50 border border-slate-200/50 text-left animate-fade-in animate-delay-300">
                         <span className="text-lg flex items-center justify-center text-primary"><Shield size={20} /></span>
@@ -161,18 +174,7 @@ export const LandingPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="mb-8">
-                <Button
-                    fullWidth
-                    size="lg"
-                    onClick={handleContinue}
-                    rightIcon={vehicle?.isActive ? <ArrowRight size={20} /> : undefined}
-                    disabled={!vehicle?.isActive && !!vehicle}
-                    className="shadow-lg shadow-primary/20"
-                >
-                    {loading ? 'Loading...' : vehicle && !vehicle.isActive ? 'Inactive Tag' : vehicle ? 'Contact Owner' : 'Continue'}
-                </Button>
-            </div>
+           
         </MobileLayout>
     );
 };
