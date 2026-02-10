@@ -46,15 +46,15 @@ export const InteractionService = {
         }
     },
 
-    getMessages: async (interactionId: string) => {
+    getInteraction: async (interactionId: string) => {
         try {
             const response = await axios.get(`${API_URL}/interactions?interactionId=${interactionId}`);
             if (response.data && response.data.length > 0) {
-                return response.data[0].messages || [];
+                return response.data[0];
             }
-            return [];
+            return null;
         } catch (error) {
-            console.error('Error fetching messages:', error);
+            console.error('Error fetching interaction:', error);
             throw error;
         }
     }

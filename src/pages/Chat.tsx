@@ -59,19 +59,17 @@ export const ChatPage: React.FC = () => {
 
         const initChat = async () => {
             try {
-                // Fetch interaction data once
-                const response = await InteractionService.getMessages(interactionId);
+                // Fetch full interaction data
+                const interaction = await InteractionService.getInteraction(interactionId);
 
-                if (response.data && response.data.length > 0) {
-                    const fetchedInteraction = response.data[0];
-
+                if (interaction) {
                     // Set initial state
-                    setMessages(fetchedInteraction.messages || []);
-                    if (fetchedInteraction.userId) {
-                        setTargetUserId(fetchedInteraction.userId);
+                    setMessages(interaction.messages || []);
+                    if (interaction.userId) {
+                        setTargetUserId(interaction.userId);
                     }
 
-                    const currentStatus = fetchedInteraction.status || 'active';
+                    const currentStatus = interaction.status || 'active';
                     setChatStatus(currentStatus as any);
 
                     // STRICT SESSION CONTROL:
@@ -81,9 +79,7 @@ export const ChatPage: React.FC = () => {
                     }
 
                     // If it's NOT ended, ensure it's set to 'active' for the chat session
-                    // Only do this if we are "starting" the chat, but if we are just viewing history, 
-                    // we might not want to re-trigger 'active' if it was 'scan'. 
-                    // But for now, 'active' is fine if it wasn't resolved.
+                    // Only do this if we are "starting" the chat (status not explicitly active)
                     if (currentStatus !== 'active') {
                         await InteractionService.updateInteraction(interactionId, {
                             contactType: 'chat',
