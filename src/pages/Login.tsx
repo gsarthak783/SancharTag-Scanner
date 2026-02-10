@@ -6,6 +6,7 @@ import { Input } from '../components/ui/Input';
 import { PhoneInput } from '../components/ui/PhoneInput';
 import { MobileLayout } from '../layouts/MobileLayout';
 import { InteractionService } from '../services/InteractionService';
+import { AuthService } from '../services/AuthService';
 
 export const LoginPage: React.FC = () => {
     const navigate = useNavigate();
@@ -14,40 +15,80 @@ export const LoginPage: React.FC = () => {
     const [step, setStep] = useState<'phone' | 'otp'>('phone');
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
+    const [testOtp, setTestOtp] = useState(''); // Store test OTP
     const [isLoading, setIsLoading] = useState(false);
+    const [isResending, setIsResending] = useState(false);
+    const [error, setError] = useState('');
 
-    const handleSendOtp = () => {
+    const handleSendOtp = async () => {
         if (phone.length < 10) return;
         setIsLoading(true);
-        // Simulate API call
-        setTimeout(() => {
+        setError('');
+
+        try {
+            const response = await AuthService.sendOtp(phone);
+            if (response.success) {
+                console.log('OTP Sent:', response.otp);
+                if (response.otp) setTestOtp(response.otp);
+                setStep('otp');
+            } else {
+                setError(response.message || 'Failed to send OTP');
+            }
+        } catch (err: any) {
+            console.error('Error sending OTP:', err);
+            setError(err.response?.data?.message || 'Failed to send OTP');
+        } finally {
             setIsLoading(false);
-            setStep('otp');
-        }, 1500);
+        }
+    };
+
+    const handleResendOtp = async () => {
+        setIsResending(true);
+        setError('');
+        setOtp('');
+
+        try {
+            const response = await AuthService.sendOtp(phone);
+            if (response.success) {
+                console.log('OTP Resent:', response.otp);
+                if (response.otp) setTestOtp(response.otp);
+            } else {
+                setError(response.message || 'Failed to resend OTP');
+            }
+        } catch (err: any) {
+            console.error('Error resending OTP:', err);
+            setError(err.response?.data?.message || 'Failed to resend OTP');
+        } finally {
+            setIsResending(false);
+        }
     };
 
     const handleVerifyOtp = async () => {
-        if (otp.length < 4) return;
+        if (otp.length < 6) return;
         setIsLoading(true);
+        setError('');
 
         try {
-            // Simulate OTP verification API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const response = await AuthService.verifyOtp(phone, otp);
 
-            // On success, update the interaction with the verified phone number
-            if (interactionId) {
-                await InteractionService.updateInteraction(interactionId, {
-                    'scanner.phoneNumber': phone,
-                    // Optionally update status or other fields
-                });
+            if (response.success) {
+                // On success, update the interaction with the verified phone number
+                if (interactionId) {
+                    await InteractionService.updateInteraction(interactionId, {
+                        'scanner.phoneNumber': phone,
+                        // Optionally update status or other fields
+                    });
+                } else {
+                    console.warn('No interactionId found during login. Skipping update.');
+                }
+
+                navigate('/contact', { state: { vehicleId, interactionId } });
             } else {
-                console.warn('No interactionId found during login. Skipping update.');
+                setError('Invalid OTP');
             }
-
-            navigate('/contact', { state: { vehicleId, interactionId } });
-        } catch (error) {
-            console.error('Login failed:', error);
-            // Handle error (show toast etc)
+        } catch (err: any) {
+            console.error('Login failed:', err);
+            setError(err.response?.data?.message || 'Invalid OTP. Please try again.');
         } finally {
             setIsLoading(false);
         }
@@ -75,7 +116,14 @@ export const LoginPage: React.FC = () => {
                     <p className="text-text-secondary text-lg leading-relaxed">
                         {step === 'phone'
                             ? 'Please enter your mobile number to continue.'
-                            : `Enter the verification code sent to ${phone}`
+                            : <span className="flex flex-col">
+                                <span>Enter the code sent to <span className="font-bold text-primary">{phone}</span></span>
+                                {testOtp && (
+                                    <span className="mt-4 bg-yellow-100 px-4 py-2 rounded-lg border border-yellow-200 text-yellow-800 text-xs font-bold text-center inline-block">
+                                        TEST OTP: <span className="text-lg">{testOtp}</span>
+                                    </span>
+                                )}
+                            </span>
                         }
                     </p>
                 </div>
@@ -98,16 +146,22 @@ export const LoginPage: React.FC = () => {
                                 One-Time Password
                             </label>
                             <Input
-                                placeholder="• • • •"
+                                placeholder="• • • • • •"
                                 type="text"
                                 className="text-center text-3xl font-bold tracking-[0.5em] h-16 bg-surface border-transparent focus:border-text-primary focus:bg-background transition-all"
                                 value={otp}
                                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                 autoFocus
+                                maxLength={6}
                             />
+                            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                             <div className="flex justify-end">
-                                <button className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
-                                    Resend Code?
+                                <button
+                                    onClick={handleResendOtp}
+                                    disabled={isResending}
+                                    className={`text-sm font-medium text-text-secondary hover:text-text-primary transition-colors ${isResending ? 'opacity-50' : ''}`}
+                                >
+                                    {isResending ? 'Resending...' : 'Resend Code?'}
                                 </button>
                             </div>
                         </div>
@@ -118,10 +172,10 @@ export const LoginPage: React.FC = () => {
                         size="lg"
                         isLoading={isLoading}
                         onClick={step === 'phone' ? handleSendOtp : handleVerifyOtp}
-                        disabled={step === 'phone' ? phone.length < 10 : otp.length < 4}
+                        disabled={isLoading || (step === 'phone' ? phone.length < 10 : otp.length < 6)}
                         className="h-14 text-lg font-bold shadow-none rounded-xl"
                     >
-                        {step === 'phone' ? 'Continue' : 'Verify'}
+                        {isLoading ? (step === 'phone' ? 'Generating...' : 'Verifying...') : (step === 'phone' ? 'Get OTP' : 'Verify OTP')}
                     </Button>
                 </div>
             </div>

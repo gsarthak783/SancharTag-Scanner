@@ -83,10 +83,10 @@ export const LandingPage: React.FC = () => {
 
     return (
         <MobileLayout className="p-6 justify-between">
-            <div className="flex flex-col items-center mt-12 text-center w-full flex-1">
+            <div className="flex flex-col items-center mt-8 text-center w-full flex-1">
                 <div className="mb-8 animate-fade-in relative">
                     <div className="absolute inset-0 bg-surface blur-2xl rounded-full scale-110" />
-                    <img src={Logo} alt="Sanchar Tag Logo" className="w-28 h-28 object-contain relative z-10 drop-shadow-sm" />
+                    <img src={Logo} alt="Sanchar Tag Logo" className="w-28 h-28 object-contain relative z-10 drop-shadow-sm rounded-2xl" />
                 </div>
 
                 <h1 className="text-3xl font-bold text-text-primary mb-2 font-sans tracking-tight animate-fade-in animate-delay-100">
