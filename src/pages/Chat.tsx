@@ -50,12 +50,59 @@ export const ChatPage: React.FC = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // Socket connection
+    // Initial Data Fetch (HTTP)
     useEffect(() => {
         if (!interactionId) {
             navigate('/');
             return;
         }
+
+        const initChat = async () => {
+            try {
+                // Fetch interaction data once
+                const response = await InteractionService.getMessages(interactionId);
+
+                if (response.data && response.data.length > 0) {
+                    const fetchedInteraction = response.data[0];
+
+                    // Set initial state
+                    setMessages(fetchedInteraction.messages || []);
+                    if (fetchedInteraction.userId) {
+                        setTargetUserId(fetchedInteraction.userId);
+                    }
+
+                    const currentStatus = fetchedInteraction.status || 'active';
+                    setChatStatus(currentStatus as any);
+
+                    // STRICT SESSION CONTROL:
+                    // If session is already ended (resolved/reported), stop here.
+                    if (currentStatus === 'resolved' || currentStatus === 'reported') {
+                        return;
+                    }
+
+                    // If it's NOT ended, ensure it's set to 'active' for the chat session
+                    // Only do this if we are "starting" the chat, but if we are just viewing history, 
+                    // we might not want to re-trigger 'active' if it was 'scan'. 
+                    // But for now, 'active' is fine if it wasn't resolved.
+                    if (currentStatus !== 'active') {
+                        await InteractionService.updateInteraction(interactionId, {
+                            contactType: 'chat',
+                            status: 'active'
+                        });
+                        setChatStatus('active');
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to initialize chat:', err);
+            }
+        };
+
+        initChat();
+    }, [interactionId, navigate]);
+
+    // Socket connection
+    useEffect(() => {
+        if (!interactionId) return;
 
         const socket = io(SOCKET_URL, {
             transports: ['websocket', 'polling'],
@@ -66,46 +113,6 @@ export const ChatPage: React.FC = () => {
             console.log('Socket connected:', socket.id);
             setIsConnected(true);
             socket.emit('join_room', interactionId);
-
-            const initChat = async () => {
-                if (!interactionId) return;
-
-                try {
-                    // Fetch interaction data once
-                    const response = await InteractionService.getMessages(interactionId);
-
-                    if (response.data && response.data.length > 0) {
-                        const fetchedInteraction = response.data[0];
-
-                        // Set initial state
-                        setMessages(fetchedInteraction.messages || []);
-                        if (fetchedInteraction.userId) {
-                            setTargetUserId(fetchedInteraction.userId);
-                        }
-
-                        const currentStatus = fetchedInteraction.status || 'active';
-
-                        // STRICT SESSION CONTROL:
-                        // If session is already ended (resolved/reported), just set the status and STOP.
-                        // Do NOT reactivate it.
-                        if (currentStatus === 'resolved' || currentStatus === 'reported') {
-                            setChatStatus(currentStatus);
-                            return;
-                        }
-
-                        // If it's NOT ended (i.e., 'active' or 'scan'), ensure it's set to 'active' for the chat session
-                        await InteractionService.updateInteraction(interactionId, {
-                            contactType: 'chat',
-                            status: 'active'
-                        });
-                        setChatStatus('active');
-                    }
-                } catch (err) {
-                    console.error('Failed to initialize chat:', err);
-                }
-            };
-
-            initChat();
         });
 
         socket.on('receive_message', (message: Message) => {
