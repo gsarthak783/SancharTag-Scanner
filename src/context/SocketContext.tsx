@@ -140,6 +140,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 userId={incomingSignal ? callerId : callTargetId}
                 ownerName={incomingSignal ? callerName : 'Owner'} // Or fetch from contact?
                 interactionId={interactionId}
+                socket={socket}
                 socketUrl={SOCKET_URL}
                 incomingSignal={incomingSignal}
             // Vehicle number might be missing for incoming calls if not stored contextually

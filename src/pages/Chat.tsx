@@ -256,7 +256,7 @@ export const ChatPage: React.FC = () => {
                     return (
                         <div
                             key={msg.messageId}
-                            className={`flex ${msg.senderId === 'scanner' && !isCall ? 'justify-end' : 'justify-center'} ${isCall ? 'my-4' : ''}`}
+                            className={`flex ${isCall ? 'justify-center' : (msg.senderId === 'scanner' ? 'justify-end' : 'justify-start')} ${isCall ? 'my-4' : ''}`}
                         >
                             {isCall ? (
                                 <div className="flex items-center gap-2 bg-gray-100 text-gray-600 px-4 py-2 rounded-full text-xs font-medium">
