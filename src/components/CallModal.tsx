@@ -31,7 +31,7 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<any>(null);
 
     // Timer Logic
     useEffect(() => {
@@ -297,8 +297,8 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                         onClick={toggleSpeaker}
                         disabled={callStatus !== 'connected'}
                         className={`p-4 rounded-full transition-all duration-200 ${isSpeakerOn
-                                ? 'bg-white text-black hover:bg-gray-200'
-                                : 'bg-white/10 text-white hover:bg-white/20'
+                            ? 'bg-white text-black hover:bg-gray-200'
+                            : 'bg-white/10 text-white hover:bg-white/20'
                             } ${callStatus !== 'connected' ? 'opacity-40' : ''}`}
                     >
                         {isSpeakerOn ? <Volume2 size={28} /> : <VolumeX size={28} />}
@@ -309,8 +309,8 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
                         onClick={toggleMute}
                         disabled={callStatus !== 'connected'}
                         className={`p-4 rounded-full transition-all duration-200 ${isMuted
-                                ? 'bg-white text-black hover:bg-gray-200'
-                                : 'bg-white/10 text-white hover:bg-white/20'
+                            ? 'bg-white text-black hover:bg-gray-200'
+                            : 'bg-white/10 text-white hover:bg-white/20'
                             } ${callStatus !== 'connected' ? 'opacity-40' : ''}`}
                     >
                         {isMuted ? <MicOff size={28} /> : <Mic size={28} />}
