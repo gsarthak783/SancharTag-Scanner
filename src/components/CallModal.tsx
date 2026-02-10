@@ -213,10 +213,17 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
 
         // Cleanup Socket
         if (socketRef.current) {
-            if (emit) {
+            if (emit && socketRef.current.connected) {
+                console.log('Emitting endCall to:', userId);
                 socketRef.current.emit('endCall', { to: userId, interactionId });
+                // Allow a moment for the event to be flushed before disconnecting
+                const socket = socketRef.current;
+                setTimeout(() => {
+                    if (socket) socket.disconnect();
+                }, 1000);
+            } else {
+                socketRef.current.disconnect();
             }
-            socketRef.current.disconnect();
             socketRef.current = null;
         }
 
