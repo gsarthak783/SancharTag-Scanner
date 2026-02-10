@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Mic, MicOff, PhoneOff, Volume2, VolumeX } from 'lucide-react';
 
@@ -9,7 +9,9 @@ interface CallModalProps {
     ownerName: string;
     vehicleNumber?: string;
     interactionId?: string | null;
-    socketUrl: string; // 'https://sanchartag-server.onrender.com'
+    socket?: Socket | null; // Reuse existing socket
+    socketUrl: string; // Fallback or for fresh connection
+    incomingSignal?: any; // Signal data for incoming calls
 }
 
 const STUN_SERVERS = {
@@ -19,8 +21,8 @@ const STUN_SERVERS = {
     ],
 };
 
-export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, ownerName, vehicleNumber, interactionId, socketUrl }) => {
-    const [callStatus, setCallStatus] = useState<'calling' | 'connected' | 'ended' | 'failed'>('calling');
+export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, ownerName, vehicleNumber, interactionId, socketUrl, incomingSignal, socket }) => {
+    const [callStatus, setCallStatus] = useState<'calling' | 'connected' | 'ended' | 'failed' | 'incoming'>('calling');
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(false);
     const [statusMessage, setStatusMessage] = useState('Calling...');
@@ -43,7 +45,7 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
             if (timerRef.current) {
                 clearInterval(timerRef.current);
             }
-            if (callStatus === 'calling' || callStatus === 'failed') {
+            if (callStatus === 'calling' || callStatus === 'failed' || callStatus === 'incoming') {
                 setSeconds(0);
             }
         }
@@ -58,145 +60,19 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    useEffect(() => {
-        if (!isOpen) {
-            setSeconds(0);
-            return;
+    const handleCallError = useCallback((err: any) => {
+        console.error('Call error:', err);
+        setCallStatus('failed');
+        if (err.name === 'NotFoundError' || err.message?.includes('device not found')) {
+            setStatusMessage('No microphone found. Please connect one.');
+        } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            setStatusMessage('Microphone permission denied. Please allow access.');
+        } else {
+            setStatusMessage('Failed to access microphone or connect.');
         }
+    }, []);
 
-        console.log('Starting call to:', userId);
-        setCallStatus('calling');
-        setStatusMessage('Connecting...');
-
-        const startCall = async () => {
-            try {
-                // 1. Get Local Stream (Microphone)
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                localStreamRef.current = stream;
-
-                // 2. Initialize Socket
-                socketRef.current = io(socketUrl, {
-                    transports: ['websocket', 'polling'],
-                });
-
-                await new Promise<void>((resolve, reject) => {
-                    if (socketRef.current?.connected) {
-                        resolve();
-                        return;
-                    }
-
-                    const timeout = setTimeout(() => {
-                        reject(new Error('Socket connection timeout'));
-                    }, 10000);
-
-                    socketRef.current?.once('connect', () => {
-                        clearTimeout(timeout);
-                        console.log('Socket connected for call, ID:', socketRef.current?.id);
-                        resolve();
-                    });
-
-                    socketRef.current?.once('connect_error', (err) => {
-                        clearTimeout(timeout);
-                        reject(err);
-                    });
-                });
-
-                // 3. Initialize Peer Connection
-                const pc = new RTCPeerConnection(STUN_SERVERS);
-                peerConnectionRef.current = pc;
-
-                // Add local tracks to peer connection
-                stream.getTracks().forEach((track) => {
-                    pc.addTrack(track, stream);
-                });
-
-                // Handle remote stream
-                pc.ontrack = (event) => {
-                    console.log('Remote stream received');
-                    if (remoteAudioRef.current && event.streams[0]) {
-                        remoteAudioRef.current.srcObject = event.streams[0];
-                    }
-                };
-
-                // Handle ICE candidates
-                pc.onicecandidate = (event) => {
-                    if (event.candidate && socketRef.current) {
-                        socketRef.current.emit('iceCandidate', {
-                            to: userId,
-                            candidate: event.candidate,
-                        });
-                    }
-                };
-
-                // 4. Create Offer
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-
-                console.log('Emitting callUser with ID:', socketRef.current?.id);
-
-                // 5. Emit Call
-                socketRef.current.emit('callUser', {
-                    userToCall: userId,
-                    signalData: offer,
-                    from: socketRef.current?.id,
-                    name: 'Scanner',
-                    vehicleNumber,
-                    interactionId
-                });
-
-                // 6. Listen for Answer
-                socketRef.current.on('callAccepted', async (signal) => {
-                    console.log('Call accepted!');
-                    setCallStatus('connected');
-                    setStatusMessage('Connected');
-                    if (pc.signalingState !== 'stable') {
-                        await pc.setRemoteDescription(new RTCSessionDescription(signal));
-                    }
-                });
-
-                // Listen for ICE candidates from Owner
-                socketRef.current.on('iceCandidate', async (data) => {
-                    if (data.candidate && pc) {
-                        try {
-                            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                        } catch (e) {
-                            console.error("Error adding received ice candidate", e);
-                        }
-                    }
-                });
-
-                socketRef.current.on('callEnded', () => {
-                    endCall(false); // End without emitting (received from remote)
-                    setStatusMessage('Call Ended');
-                    setTimeout(onClose, 2000);
-                });
-
-                // Set status to calling after everything is ready
-                setCallStatus('calling');
-                setStatusMessage('Calling...');
-
-            } catch (err: any) {
-                console.error('Error starting call:', err);
-                setCallStatus('failed');
-
-                if (err.name === 'NotFoundError' || err.message?.includes('device not found')) {
-                    setStatusMessage('No microphone found. Please connect one.');
-                } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    setStatusMessage('Microphone permission denied. Please allow access.');
-                } else {
-                    setStatusMessage('Failed to access microphone or connect.');
-                }
-            }
-        };
-
-        startCall();
-
-        return () => {
-            endCall();
-        };
-    }, [isOpen, userId, socketUrl, vehicleNumber, interactionId]);
-
-    const endCall = (emit: boolean = true) => {
+    const endCall = useCallback((emit: boolean = true) => {
         if (timerRef.current) clearInterval(timerRef.current);
 
         // Cleanup Media
@@ -228,7 +104,170 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
         }
 
         setCallStatus('ended');
-    };
+    }, [userId, interactionId]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setSeconds(0);
+            return;
+        }
+
+        const initializeSocket = async () => {
+            // If socket prop is provided, use it
+            if (socket) {
+                socketRef.current = socket;
+                // It might already be connected
+                if (socket.connected) return;
+            }
+
+            // Otherwise create new (fallback)
+            if (!socketRef.current) {
+                socketRef.current = io(socketUrl, {
+                    transports: ['websocket', 'polling'],
+                });
+            }
+
+            await new Promise<void>((resolve, reject) => {
+                if (socketRef.current?.connected) {
+                    resolve();
+                    return;
+                }
+                const timeout = setTimeout(() => reject(new Error('Socket connection timeout')), 10000);
+                socketRef.current?.once('connect', () => {
+                    clearTimeout(timeout);
+                    console.log('Socket connected for call, ID:', socketRef.current?.id);
+                    resolve();
+                });
+                socketRef.current?.once('connect_error', (err) => {
+                    clearTimeout(timeout);
+                    reject(err);
+                });
+            });
+        };
+
+        const setupPeerConnection = async () => {
+            // 1. Get Local Stream (Microphone)
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            localStreamRef.current = stream;
+
+            // 3. Initialize Peer Connection
+            const pc = new RTCPeerConnection(STUN_SERVERS);
+            peerConnectionRef.current = pc;
+
+            // Add local tracks to peer connection
+            stream.getTracks().forEach((track) => {
+                pc.addTrack(track, stream);
+            });
+
+            // Handle remote stream
+            pc.ontrack = (event) => {
+                console.log('Remote stream received');
+                if (remoteAudioRef.current && event.streams[0]) {
+                    remoteAudioRef.current.srcObject = event.streams[0];
+                }
+            };
+
+            // Handle ICE candidates
+            pc.onicecandidate = (event) => {
+                if (event.candidate && socketRef.current) {
+                    socketRef.current.emit('iceCandidate', {
+                        to: userId,
+                        candidate: event.candidate,
+                    });
+                }
+            };
+
+            // Listen for ICE candidates from remote
+            socketRef.current?.on('iceCandidate', async (data: any) => {
+                if (data.candidate && pc) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } catch (e) {
+                        console.error("Error adding received ice candidate", e);
+                    }
+                }
+            });
+
+            socketRef.current?.on('callEnded', () => {
+                endCall(false);
+                setStatusMessage('Call Ended');
+                setTimeout(onClose, 2000);
+            });
+
+            return pc;
+        };
+
+        const startOutgoingCall = async () => {
+            try {
+                console.log('Starting outgoing call to:', userId);
+                setCallStatus('calling');
+                setStatusMessage('Connecting...');
+
+                await initializeSocket();
+                const pc = await setupPeerConnection();
+
+                // Create Offer
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                console.log('Emitting callUser');
+                socketRef.current?.emit('callUser', {
+                    userToCall: userId,
+                    signalData: offer,
+                    from: socketRef.current?.id,
+                    name: 'Scanner',
+                    vehicleNumber,
+                    interactionId
+                });
+
+                socketRef.current?.on('callAccepted', async (signal: any) => {
+                    console.log('Call accepted!');
+                    setCallStatus('connected');
+                    setStatusMessage('Connected');
+                    if (pc.signalingState !== 'stable') {
+                        await pc.setRemoteDescription(new RTCSessionDescription(signal));
+                    }
+                });
+
+            } catch (err: any) {
+                console.error('Error starting outgoing call:', err);
+                handleCallError(err);
+            }
+        };
+
+        const setupIncomingCallListener = async () => {
+            // For incoming calls, we might already have the signal passed in props?
+            // Or we just initialize socket and wait for user to Accept?
+            // If `incomingSignal` prop is present, it means we are already in "Incoming" state.
+            setCallStatus('incoming');
+            setStatusMessage('Incoming Voice Call...');
+
+            // We need to initialize socket to be able to send Answer later
+            try {
+                await initializeSocket();
+
+                // Also listen for endCall here just in case caller cancels before we accept
+                socketRef.current?.on('callEnded', () => {
+                    endCall(false);
+                    setStatusMessage('Call Ended');
+                    setTimeout(onClose, 2000);
+                });
+
+            } catch (e) {
+                console.error("Socket init failed for incoming", e);
+            }
+        };
+
+        if (incomingSignal) {
+            setupIncomingCallListener();
+        } else {
+            startOutgoingCall();
+        }
+
+        return () => {
+            endCall();
+        };
+    }, [isOpen, userId, socketUrl, vehicleNumber, interactionId, incomingSignal, handleCallError, endCall]);
 
     const toggleMute = () => {
         if (localStreamRef.current) {
@@ -253,6 +292,70 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
             setIsSpeakerOn(!isSpeakerOn);
         } catch (err) {
             console.error('Error toggling speaker:', err);
+        }
+    };
+
+    const handleAccept = async () => {
+        try {
+            setStatusMessage('Connecting...');
+
+            // WE reused `setupPeerConnection` inside useEffect, which is not accessible here.
+            // We need to replicate the setup logic or refactor. 
+            // For now, let's replicate the essential parts since I can't easily hoist it without massive change.
+
+            // 1. Get Media
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            localStreamRef.current = stream;
+
+            // 2. Peer Connection
+            const pc = new RTCPeerConnection(STUN_SERVERS);
+            peerConnectionRef.current = pc;
+
+            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+            pc.ontrack = (event) => {
+                if (remoteAudioRef.current && event.streams[0]) {
+                    remoteAudioRef.current.srcObject = event.streams[0];
+                }
+            };
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate && socketRef.current) {
+                    socketRef.current.emit('iceCandidate', {
+                        to: userId,
+                        candidate: event.candidate,
+                    });
+                }
+            };
+
+            // Listen for ICE candidates from Owner (need to re-attach listener or ensure socket persists)
+            socketRef.current?.on('iceCandidate', async (data: any) => {
+                if (data.candidate && pc) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } catch (e) { console.error(e); }
+                }
+            });
+
+            // 3. Set Remote Description (Offer)
+            await pc.setRemoteDescription(new RTCSessionDescription(incomingSignal));
+
+            // 4. Create Answer
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            // 5. Emit Answer
+            socketRef.current?.emit('answerCall', {
+                signal: answer,
+                to: userId
+            });
+
+            setCallStatus('connected');
+            setStatusMessage('Connected');
+
+        } catch (err) {
+            console.error("Error accepting call:", err);
+            handleCallError(err);
         }
     };
 
@@ -298,42 +401,66 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
 
             {/* Bottom Controls */}
             <div className="relative z-10 w-full max-w-sm mb-12">
-                <div className="flex items-center justify-center gap-8 bg-black/20 backdrop-blur-lg p-6 rounded-3xl border border-white/5">
-                    {/* Speaker */}
-                    <button
-                        onClick={toggleSpeaker}
-                        disabled={callStatus !== 'connected'}
-                        className={`p-4 rounded-full transition-all duration-200 ${isSpeakerOn
-                            ? 'bg-white text-black hover:bg-gray-200'
-                            : 'bg-white/10 text-white hover:bg-white/20'
-                            } ${callStatus !== 'connected' ? 'opacity-40' : ''}`}
-                    >
-                        {isSpeakerOn ? <Volume2 size={28} /> : <VolumeX size={28} />}
-                    </button>
 
-                    {/* Mute */}
-                    <button
-                        onClick={toggleMute}
-                        disabled={callStatus !== 'connected'}
-                        className={`p-4 rounded-full transition-all duration-200 ${isMuted
-                            ? 'bg-white text-black hover:bg-gray-200'
-                            : 'bg-white/10 text-white hover:bg-white/20'
-                            } ${callStatus !== 'connected' ? 'opacity-40' : ''}`}
-                    >
-                        {isMuted ? <MicOff size={28} /> : <Mic size={28} />}
-                    </button>
+                {callStatus === 'incoming' ? (
+                    <div className="flex items-center justify-center gap-12 bg-black/20 backdrop-blur-lg p-6 rounded-3xl border border-white/5">
+                        {/* Reject */}
+                        <button
+                            onClick={() => {
+                                endCall(true);
+                                onClose();
+                            }}
+                            className="p-5 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all transform hover:scale-110 shadow-lg shadow-red-500/30"
+                        >
+                            <PhoneOff size={32} />
+                        </button>
 
-                    {/* End Call */}
-                    <button
-                        onClick={() => {
-                            endCall();
-                            onClose();
-                        }}
-                        className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all transform hover:scale-105 shadow-lg shadow-red-500/30"
-                    >
-                        <PhoneOff size={28} />
-                    </button>
-                </div>
+                        {/* Accept */}
+                        <button
+                            onClick={handleAccept}
+                            className="p-5 rounded-full bg-green-500 text-white hover:bg-green-600 transition-all transform hover:scale-110 shadow-lg shadow-green-500/30 animate-pulse"
+                        >
+                            <Mic size={32} />
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex items-center justify-center gap-8 bg-black/20 backdrop-blur-lg p-6 rounded-3xl border border-white/5">
+                        {/* Speaker */}
+                        <button
+                            onClick={toggleSpeaker}
+                            disabled={callStatus !== 'connected'}
+                            className={`p-4 rounded-full transition-all duration-200 ${isSpeakerOn
+                                ? 'bg-white text-black hover:bg-gray-200'
+                                : 'bg-white/10 text-white hover:bg-white/20'
+                                } ${callStatus !== 'connected' ? 'opacity-40' : ''}`}
+                        >
+                            {isSpeakerOn ? <Volume2 size={28} /> : <VolumeX size={28} />}
+                        </button>
+
+                        {/* Mute */}
+                        <button
+                            onClick={toggleMute}
+                            disabled={callStatus !== 'connected'}
+                            className={`p-4 rounded-full transition-all duration-200 ${isMuted
+                                ? 'bg-white text-black hover:bg-gray-200'
+                                : 'bg-white/10 text-white hover:bg-white/20'
+                                } ${callStatus !== 'connected' ? 'opacity-40' : ''}`}
+                        >
+                            {isMuted ? <MicOff size={28} /> : <Mic size={28} />}
+                        </button>
+
+                        {/* End Call */}
+                        <button
+                            onClick={() => {
+                                endCall();
+                                onClose();
+                            }}
+                            className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all transform hover:scale-105 shadow-lg shadow-red-500/30"
+                        >
+                            <PhoneOff size={28} />
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

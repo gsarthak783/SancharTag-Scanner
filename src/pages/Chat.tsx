@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { io, Socket } from 'socket.io-client';
+// import { io, Socket } from 'socket.io-client'; // Removed
 import { ArrowLeft, Send, Flag, X, CheckCircle, Phone } from 'lucide-react';
 import { MobileLayout } from '../layouts/MobileLayout';
 import { InteractionService } from '../services/InteractionService';
-import { CallModal } from '../components/CallModal';
+// import { CallModal } from '../components/CallModal'; // Removed, handled globally
 import axios from 'axios';
+import { useSocket } from '../context/SocketContext';
+// import { Message } from '../types/index'; // Removed
 
-const SOCKET_URL = 'https://sanchartag-server.onrender.com';
 const API_URL = 'https://sanchartag-server.onrender.com';
 
 const REPORT_CATEGORIES = [
@@ -30,20 +31,22 @@ interface Message {
 export const ChatPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { interactionId, ownerName, vehicleNumber } = location.state || {};
+    const { interactionId, ownerName } = location.state || {};
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [targetUserId, setTargetUserId] = useState<string>(location.state?.userId || ''); // State for owner's ID
     const [inputText, setInputText] = useState('');
-    const [isConnected, setIsConnected] = useState(false);
+    // const [isConnected, setIsConnected] = useState(false); // Global context handles this
     const [chatStatus, setChatStatus] = useState<'active' | 'resolved' | 'reported'>('active');
     const [showReportModal, setShowReportModal] = useState(false);
-    const [showCallModal, setShowCallModal] = useState(false);
+    // const [showCallModal, setShowCallModal] = useState(false); // Global context handles this
     const [reportCategory, setReportCategory] = useState('');
     const [reportDescription, setReportDescription] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const socketRef = useRef<Socket | null>(null);
+    // const socketRef = useRef<Socket | null>(null); // Global context handles this
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const { socket, isConnected, startCall } = useSocket();
 
     // Scroll to bottom when messages change
     useEffect(() => {
@@ -96,52 +99,38 @@ export const ChatPage: React.FC = () => {
         initChat();
     }, [interactionId, navigate]);
 
-    // Socket connection
+    // Socket listeners using Global Socket
     useEffect(() => {
-        if (!interactionId) return;
+        if (!socket || !interactionId) return;
 
-        const socket = io(SOCKET_URL, {
-            transports: ['websocket', 'polling'],
-        });
-        socketRef.current = socket;
-
-        socket.on('connect', async () => {
-            console.log('Socket connected:', socket.id);
-            setIsConnected(true);
-            socket.emit('join_room', interactionId);
-        });
-
-        socket.on('receive_message', (message: Message) => {
+        // Listeners
+        const onReceiveMessage = (message: Message) => {
             setMessages((prev) => [...prev, message]);
-        });
+        };
 
-        socket.on('session_ended', (data: { status: string }) => {
+        const onSessionEnded = (data: { status: string }) => {
             setChatStatus(data.status as 'active' | 'resolved' | 'reported');
-        });
+        };
 
-        socket.on('status_update', (data: { status: string }) => {
+        const onStatusUpdate = (data: { status: string }) => {
             setChatStatus(data.status as 'active' | 'resolved' | 'reported');
-        });
+        };
 
-        socket.on('disconnect', () => {
-            console.log('Socket disconnected');
-            setIsConnected(false);
-        });
-
-        socket.on('error', (error: { message: string }) => {
-            console.error('Socket error:', error.message);
-        });
+        socket.on('receive_message', onReceiveMessage);
+        socket.on('session_ended', onSessionEnded);
+        socket.on('status_update', onStatusUpdate);
 
         return () => {
-            socket.emit('leave_room', interactionId);
-            socket.disconnect();
+            socket.off('receive_message', onReceiveMessage);
+            socket.off('session_ended', onSessionEnded);
+            socket.off('status_update', onStatusUpdate);
         };
-    }, [interactionId, navigate]);
+    }, [socket, interactionId]);
 
     const handleSend = () => {
-        if (!inputText.trim() || !socketRef.current || !isConnected || chatStatus !== 'active') return;
+        if (!inputText.trim() || !socket || !isConnected || chatStatus !== 'active') return;
 
-        socketRef.current.emit('send_message', {
+        socket.emit('send_message', {
             interactionId,
             text: inputText.trim(),
             senderId: 'scanner',
@@ -158,8 +147,8 @@ export const ChatPage: React.FC = () => {
     };
 
     const handleEndSession = () => {
-        if (!socketRef.current || chatStatus !== 'active') return;
-        socketRef.current.emit('end_session', { interactionId, endedBy: 'scanner' });
+        if (!socket || chatStatus !== 'active') return;
+        socket.emit('end_session', { interactionId, endedBy: 'scanner' });
     };
 
     const handleReportSubmit = async () => {
@@ -174,7 +163,7 @@ export const ChatPage: React.FC = () => {
                 description: reportDescription
             });
 
-            socketRef.current?.emit('report_submitted', { interactionId, reportedBy: 'scanner' });
+            socket?.emit('report_submitted', { interactionId, reportedBy: 'scanner' });
             setShowReportModal(false);
             setChatStatus('reported');
         } catch (err) {
@@ -216,7 +205,7 @@ export const ChatPage: React.FC = () => {
                 {isActive && (
                     <div className="flex gap-2">
                         <button
-                            onClick={() => setShowCallModal(true)}
+                            onClick={() => startCall(targetUserId)}
                             disabled={!targetUserId}
                             className="p-2 rounded-full hover:bg-green-50 text-green-600 transition-colors disabled:opacity-50"
                             title="Call Owner"
@@ -357,16 +346,7 @@ export const ChatPage: React.FC = () => {
                     </div>
                 </div>
             )}
-            {/* Call Modal */}
-            <CallModal
-                isOpen={showCallModal}
-                onClose={() => setShowCallModal(false)}
-                userId={targetUserId}
-                ownerName={ownerName || 'Owner'}
-                vehicleNumber={vehicleNumber}
-                interactionId={interactionId}
-                socketUrl={SOCKET_URL}
-            />
+            {/* Call Modal removed from here, handled globally in context */}
         </MobileLayout>
     );
 };

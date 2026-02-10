@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { MobileLayout } from '../layouts/MobileLayout';
 import { VehicleService, type VehicleDetails } from '../services/VehicleService';
 import Logo from '../assets/SancharTagLogo.png';
+import { useSocket } from '../context/SocketContext';
 
 export const ContactPage: React.FC = () => {
     const navigate = useNavigate();
@@ -12,6 +13,7 @@ export const ContactPage: React.FC = () => {
     const { vehicleId } = location.state || {};
     const [vehicle, setVehicle] = useState<VehicleDetails | null>(null);
     const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+    const { joinRoom } = useSocket();
 
     useEffect(() => {
         if (vehicleId) {
@@ -19,7 +21,13 @@ export const ContactPage: React.FC = () => {
                 .then(setVehicle)
                 .catch(console.error);
         }
-    }, [vehicleId]);
+
+        // Ensure we join the socket room for this interaction if ID exists
+        const interactionId = localStorage.getItem('currentInteractionId');
+        if (interactionId) {
+            joinRoom(interactionId);
+        }
+    }, [vehicleId, joinRoom]);
 
 
     return (
