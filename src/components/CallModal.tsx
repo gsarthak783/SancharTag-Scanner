@@ -92,14 +92,22 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
             if (emit && socketRef.current.connected) {
                 console.log('Emitting endCall to:', userId);
                 socketRef.current.emit('endCall', { to: userId, interactionId });
-                // Allow a moment for the event to be flushed before disconnecting
-                const socket = socketRef.current;
-                setTimeout(() => {
-                    if (socket) socket.disconnect();
-                }, 1000);
-            } else {
+
+                // Only disconnect if we created the socket internally (no socket prop passed)
+                if (!socket) {
+                    const localSocket = socketRef.current;
+                    setTimeout(() => {
+                        if (localSocket) localSocket.disconnect();
+                    }, 1000);
+                }
+            } else if (!socket) {
+                // Only disconnect if we created the socket internally
                 socketRef.current.disconnect();
             }
+
+            // If we are sharing socket, we don't nullify it here effectively (it's in context/prop)
+            // But we can clear our ref if we want to reset local state, but careful not to break re-opens.
+            // Actually, useEffect sets socketRef.current again on open.
             socketRef.current = null;
         }
 
