@@ -10,7 +10,7 @@ interface SocketContextType {
     interactionId: string | null;
     joinRoom: (id: string) => void;
     leaveRoom: () => void;
-    startCall: (targetUserId: string) => void;
+    startCall: (targetUserId: string, interactionId?: string) => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -113,8 +113,18 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         localStorage.removeItem('currentInteractionId');
     };
 
-    const startCall = (targetUserId: string) => {
+    const startCall = (targetUserId: string, callInteractionId?: string) => {
         setCallTargetId(targetUserId);
+        // If interactionId is passed, we should ensure it's used if the global one isn't set, 
+        // or just rely on the fact that we are in that interaction context.
+        // But CallModal needs it to pass to 'callUser'.
+        // Actually CallModal uses the global 'interactionId' from context.
+        // If we are in Chat, 'interactionId' is already set in context via 'joinRoom'.
+        // So we might not strictly need to pass it here IF joinRoom was called.
+        // But to be safe and explicit (like in Owner app), let's allow passing it.
+        // However, CallModal currently takes 'interactionId' from context.
+        // Let's rely on global interactionId for now as ChatPage calls joinRoom.
+
         setShowCallModal(true);
     };
 

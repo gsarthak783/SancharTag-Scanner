@@ -47,7 +47,7 @@ export const ChatPage: React.FC = () => {
     // const socketRef = useRef<Socket | null>(null); // Global context handles this
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const { socket, isConnected, startCall } = useSocket();
+    const { socket, isConnected, startCall, joinRoom } = useSocket();
 
     // Scroll to bottom when messages change
     useEffect(() => {
@@ -60,6 +60,9 @@ export const ChatPage: React.FC = () => {
             navigate('/');
             return;
         }
+
+        // Join socket room
+        joinRoom(interactionId);
 
         const initChat = async () => {
             try {
@@ -98,7 +101,7 @@ export const ChatPage: React.FC = () => {
         };
 
         initChat();
-    }, [interactionId, navigate]);
+    }, [interactionId, navigate, joinRoom]);
 
     // Socket listeners using Global Socket
     useEffect(() => {
@@ -206,25 +209,26 @@ export const ChatPage: React.FC = () => {
                 {isActive && (
                     <div className="flex gap-2">
                         <button
-                            onClick={() => startCall(targetUserId)}
+                            onClick={() => startCall(targetUserId, interactionId)}
                             disabled={!targetUserId}
-                            className="p-2 rounded-full hover:bg-green-50 text-green-600 transition-colors disabled:opacity-50"
+                            className="p-2 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors disabled:opacity-50"
                             title="Call Owner"
                         >
                             <Phone size={20} />
                         </button>
                         <button
                             onClick={() => setShowReportModal(true)}
-                            className="p-2 rounded-full hover:bg-red-50 text-red-500 transition-colors"
+                            className="p-2 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
                             title="Report"
                         >
-                            <Flag size={18} />
+                            <Flag size={20} />
                         </button>
                         <button
                             onClick={handleEndSession}
-                            className="px-3 py-1.5 text-xs bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors"
+                            className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                            title="End Session"
                         >
-                            End Session
+                            <X size={20} />
                         </button>
                     </div>
                 )}
@@ -290,7 +294,7 @@ export const ChatPage: React.FC = () => {
 
             {/* Input - Only show if active */}
             {isActive && (
-                <div className="p-4 border-t border-border bg-white">
+                <div className="p-4 border-t border-border bg-white sticky bottom-0 z-10">
                     <div className="flex items-center gap-2">
                         <input
                             type="text"
