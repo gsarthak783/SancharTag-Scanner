@@ -67,53 +67,45 @@ export const ChatPage: React.FC = () => {
             setIsConnected(true);
             socket.emit('join_room', interactionId);
 
-            // Fetch existing messages and status
-            try {
-                const response = await axios.get(`${API_URL}/interactions?interactionId=${interactionId}`);
-                if (response.data && response.data.length > 0) {
-                    const interaction = response.data[0];
-                    setMessages(interaction.messages || []);
+            const initChat = async () => {
+                if (!interactionId) return;
 
-                    // Fetch userId if not present in location state
-                    if (!location.state?.userId && interaction.userId) {
-                        // We might need to store this in a ref or state to pass to CallModal
-                        // Let's verify if CallModal needs userId (owner's ID). Yes.
-                        // But we can't update location state easily without navigate. 
-                        // Let's add a local state for target user ID.
-                    }
-                    if (interaction.userId) {
-                        setTargetUserId(interaction.userId);
-                    }
+                try {
+                    // Fetch interaction data once
+                    const response = await InteractionService.getMessages(interactionId);
 
-                    // If resolved but NO messages (first time opening after auto-resolve), set to active
-                    if (interaction.status === 'resolved' && (!interaction.messages || interaction.messages.length === 0)) {
-                        await InteractionService.updateInteraction(interactionId, { status: 'active', resolvedAt: null });
+                    if (response.data && response.data.length > 0) {
+                        const fetchedInteraction = response.data[0];
+
+                        // Set initial state
+                        setMessages(fetchedInteraction.messages || []);
+                        if (fetchedInteraction.userId) {
+                            setTargetUserId(fetchedInteraction.userId);
+                        }
+
+                        const currentStatus = fetchedInteraction.status || 'active';
+
+                        // STRICT SESSION CONTROL:
+                        // If session is already ended (resolved/reported), just set the status and STOP.
+                        // Do NOT reactivate it.
+                        if (currentStatus === 'resolved' || currentStatus === 'reported') {
+                            setChatStatus(currentStatus);
+                            return;
+                        }
+
+                        // If it's NOT ended (i.e., 'active' or 'scan'), ensure it's set to 'active' for the chat session
+                        await InteractionService.updateInteraction(interactionId, {
+                            contactType: 'chat',
+                            status: 'active'
+                        });
                         setChatStatus('active');
-                        // Also update contactType to chat if needed, done below
-                    } else {
-                        setChatStatus(interaction.status as 'active' | 'resolved' | 'reported');
                     }
+                } catch (err) {
+                    console.error('Failed to initialize chat:', err);
                 }
-            } catch (err) {
-                console.error('Failed to fetch interaction:', err);
-            }
+            };
 
-            // Update interaction type to 'chat' and status to 'active' to ensure session is ready
-            try {
-                // We force status to active here because the user has explicitly entered the chat interface
-                // This allows them to call immediately without sending a text first.
-                // Note: If the session was properly resolved/reported, the API might ideally prevent this if we wanted strict history,
-                // but for a "Check if active" flow, ensuring it's active upon entry is what the user asked for.
-                // If it was ALREADY resolved, we might be reopening it. 
-                // However, based on "session should become active as soon as we enter", this is the desired behavior for the current flow.
-                await InteractionService.updateInteraction(interactionId, {
-                    contactType: 'chat',
-                    status: 'active'
-                });
-                setChatStatus('active');
-            } catch (err) {
-                console.error('Failed to update interaction type/status:', err);
-            }
+            initChat();
         });
 
         socket.on('receive_message', (message: Message) => {
@@ -125,7 +117,6 @@ export const ChatPage: React.FC = () => {
         });
 
         socket.on('status_update', (data: { status: string }) => {
-            // Handle reactivation from server if needed
             setChatStatus(data.status as 'active' | 'resolved' | 'reported');
         });
 
