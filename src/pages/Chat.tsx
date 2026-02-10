@@ -209,7 +209,7 @@ export const ChatPage: React.FC = () => {
                 {isActive && (
                     <div className="flex gap-2">
                         <button
-                            onClick={() => startCall(targetUserId, interactionId)}
+                            onClick={() => startCall(targetUserId)}
                             disabled={!targetUserId}
                             className="p-2 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors disabled:opacity-50"
                             title="Call Owner"
