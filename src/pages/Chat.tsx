@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import { ArrowLeft, Send, Flag, X, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Send, Flag, X, CheckCircle, Phone } from 'lucide-react';
 import { MobileLayout } from '../layouts/MobileLayout';
 import { InteractionService } from '../services/InteractionService';
+import { CallModal } from '../components/CallModal';
 import axios from 'axios';
 
 const SOCKET_URL = 'https://sanchartag-server.onrender.com';
@@ -29,13 +30,15 @@ interface Message {
 export const ChatPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { interactionId, ownerName } = location.state || {};
+    const { interactionId, ownerName, vehicleNumber } = location.state || {};
 
     const [messages, setMessages] = useState<Message[]>([]);
+    const [targetUserId, setTargetUserId] = useState<string>(location.state?.userId || ''); // State for owner's ID
     const [inputText, setInputText] = useState('');
     const [isConnected, setIsConnected] = useState(false);
     const [chatStatus, setChatStatus] = useState<'active' | 'resolved' | 'reported'>('active');
     const [showReportModal, setShowReportModal] = useState(false);
+    const [showCallModal, setShowCallModal] = useState(false);
     const [reportCategory, setReportCategory] = useState('');
     const [reportDescription, setReportDescription] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,6 +74,17 @@ export const ChatPage: React.FC = () => {
                     const interaction = response.data[0];
                     setMessages(interaction.messages || []);
 
+                    // Fetch userId if not present in location state
+                    if (!location.state?.userId && interaction.userId) {
+                        // We might need to store this in a ref or state to pass to CallModal
+                        // Let's verify if CallModal needs userId (owner's ID). Yes.
+                        // But we can't update location state easily without navigate. 
+                        // Let's add a local state for target user ID.
+                    }
+                    if (interaction.userId) {
+                        setTargetUserId(interaction.userId);
+                    }
+
                     // If resolved but NO messages (first time opening after auto-resolve), set to active
                     if (interaction.status === 'resolved' && (!interaction.messages || interaction.messages.length === 0)) {
                         await InteractionService.updateInteraction(interactionId, { status: 'active', resolvedAt: null });
@@ -84,11 +98,21 @@ export const ChatPage: React.FC = () => {
                 console.error('Failed to fetch interaction:', err);
             }
 
-            // Update interaction type to 'chat' if still active
+            // Update interaction type to 'chat' and status to 'active' to ensure session is ready
             try {
-                await InteractionService.updateInteraction(interactionId, { contactType: 'chat' });
+                // We force status to active here because the user has explicitly entered the chat interface
+                // This allows them to call immediately without sending a text first.
+                // Note: If the session was properly resolved/reported, the API might ideally prevent this if we wanted strict history,
+                // but for a "Check if active" flow, ensuring it's active upon entry is what the user asked for.
+                // If it was ALREADY resolved, we might be reopening it. 
+                // However, based on "session should become active as soon as we enter", this is the desired behavior for the current flow.
+                await InteractionService.updateInteraction(interactionId, {
+                    contactType: 'chat',
+                    status: 'active'
+                });
+                setChatStatus('active');
             } catch (err) {
-                console.error('Failed to update interaction type:', err);
+                console.error('Failed to update interaction type/status:', err);
             }
         });
 
@@ -198,6 +222,14 @@ export const ChatPage: React.FC = () => {
                 {isActive && (
                     <div className="flex gap-2">
                         <button
+                            onClick={() => setShowCallModal(true)}
+                            disabled={!targetUserId}
+                            className="p-2 rounded-full hover:bg-green-50 text-green-600 transition-colors disabled:opacity-50"
+                            title="Call Owner"
+                        >
+                            <Phone size={20} />
+                        </button>
+                        <button
                             onClick={() => setShowReportModal(true)}
                             className="p-2 rounded-full hover:bg-red-50 text-red-500 transition-colors"
                             title="Report"
@@ -206,7 +238,7 @@ export const ChatPage: React.FC = () => {
                         </button>
                         <button
                             onClick={handleEndSession}
-                            className="px-3 py-1.5 text-xs bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
+                            className="px-3 py-1.5 text-xs bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors"
                         >
                             End Session
                         </button>
@@ -331,6 +363,16 @@ export const ChatPage: React.FC = () => {
                     </div>
                 </div>
             )}
+            {/* Call Modal */}
+            <CallModal
+                isOpen={showCallModal}
+                onClose={() => setShowCallModal(false)}
+                userId={targetUserId}
+                ownerName={ownerName || 'Owner'}
+                vehicleNumber={vehicleNumber}
+                interactionId={interactionId}
+                socketUrl={SOCKET_URL}
+            />
         </MobileLayout>
     );
 };

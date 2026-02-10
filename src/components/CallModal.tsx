@@ -25,13 +25,44 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
     const [isSpeakerOn, setIsSpeakerOn] = useState(false);
     const [statusMessage, setStatusMessage] = useState('Calling...');
 
+    const [seconds, setSeconds] = useState(0);
+
     const socketRef = useRef<Socket | null>(null);
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Timer Logic
+    useEffect(() => {
+        if (callStatus === 'connected') {
+            timerRef.current = setInterval(() => {
+                setSeconds(prev => prev + 1);
+            }, 1000);
+        } else {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+            if (callStatus === 'calling' || callStatus === 'failed') {
+                setSeconds(0);
+            }
+        }
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, [callStatus]);
+
+    const formatTime = (totalSeconds: number) => {
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
 
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+            setSeconds(0);
+            return;
+        }
 
         console.log('Starting call to:', userId);
         setCallStatus('calling');
@@ -166,6 +197,8 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
     }, [isOpen, userId, socketUrl, vehicleNumber, interactionId]);
 
     const endCall = (emit: boolean = true) => {
+        if (timerRef.current) clearInterval(timerRef.current);
+
         // Cleanup Media
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -201,27 +234,15 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
 
     const toggleSpeaker = async () => {
         if (!remoteAudioRef.current) return;
-
-        // Note: setSinkId is not supported in all browsers (mostly Chrome/Edge desktop)
-        // Mobile browsers usually handle routing via OS UI
         const audioEl = remoteAudioRef.current as any;
 
         if (typeof audioEl.setSinkId !== 'function') {
             console.warn('setSinkId not supported');
-            // Mock toggle for UI feedback
             setIsSpeakerOn(!isSpeakerOn);
             return;
         }
 
         try {
-            // This is a simplified toggle. In reality, we'd need to list devices and find the speaker.
-            // For now, we'll just toggle the state to show intent, as most users are on mobile 
-            // where this button might just be a visual indicator or we can try to select 'speaker' if available in device list.
-
-            // To make it functional, we'd need: navigator.mediaDevices.enumerateDevices()
-            // But typically 'default' is the only easy target without a list.
-
-            // So we will just toggle the visual state for now unless we implement full device selection.
             setIsSpeakerOn(!isSpeakerOn);
         } catch (err) {
             console.error('Error toggling speaker:', err);
@@ -231,80 +252,80 @@ export const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, userId, o
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-fade-in backdrop-blur-sm">
-            <div className="bg-background rounded-3xl w-full max-w-sm p-8 shadow-2xl border border-white/10 flex flex-col items-center relative overflow-hidden">
+        <div className="fixed inset-0 bg-gray-900 z-[100] flex flex-col items-center justify-between p-8 text-white animate-fade-in">
+            {/* Background Gradient */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50 pointer-events-none" />
 
-                {/* Background Decor */}
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/20 to-transparent pointer-events-none" />
-
-                {/* Secure Badge */}
-                <div className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1 rounded-full mb-8">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-wider text-text-secondary font-medium">End-to-End Encrypted</span>
+            {/* Top Info */}
+            <div className="relative z-10 w-full flex flex-col items-center mt-12 space-y-4">
+                <div className="flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full backdrop-blur-md">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-xs font-medium tracking-wide text-white/90">End-to-End Encrypted</span>
                 </div>
 
-                {/* Profile / Avatar */}
-                <div className="relative mb-6">
-                    <div className="w-24 h-24 rounded-full bg-secondary/80 flex items-center justify-center ring-4 ring-primary/20 shadow-lg">
-                        <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-white/10">
-                            <span className="text-4xl font-bold text-primary">{ownerName.charAt(0)}</span>
-                        </div>
-                    </div>
-                    {callStatus === 'connected' && (
-                        <div className="absolute -inset-4 border-2 border-primary/30 rounded-full animate-ping opacity-75 pointer-events-none" />
+                <h2 className="text-3xl font-bold tracking-tight">{ownerName}</h2>
+                <div className="text-lg font-medium text-white/80">
+                    {callStatus === 'connected' ? formatTime(seconds) : statusMessage}
+                </div>
+            </div>
+
+            {/* Avatar / Visualizer */}
+            <div className="relative z-10 flex-1 flex items-center justify-center w-full">
+                <div className="relative">
+                    {/* Ripple Effects when calling/talking */}
+                    {(callStatus === 'calling' || (callStatus === 'connected' && !isMuted)) && (
+                        <>
+                            <div className="absolute inset-0 rounded-full border border-white/20 animate-[ping_2s_linear_infinite]" />
+                            <div className="absolute inset-0 rounded-full border border-white/10 animate-[ping_3s_linear_infinite_0.5s]" />
+                        </>
                     )}
+
+                    <div className="w-40 h-40 rounded-full bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center shadow-2xl ring-4 ring-white/10">
+                        <span className="text-6xl font-bold text-white/90">{ownerName.charAt(0)}</span>
+                    </div>
                 </div>
+            </div>
 
-                <h2 className="text-2xl font-bold text-text-primary mb-2 line-clamp-1 text-center">{ownerName}</h2>
-                <p className={`text-sm font-medium mb-10 ${callStatus === 'connected' ? 'text-green-500' :
-                    callStatus === 'failed' ? 'text-destructive' : 'text-text-secondary animate-pulse'
-                    }`}>
-                    {statusMessage}
-                </p>
+            {/* Hidden Audio */}
+            <audio ref={remoteAudioRef} autoPlay />
 
-                {/* Hidden Audio Element */}
-                <audio ref={remoteAudioRef} autoPlay />
-
-                {/* Controls */}
-                <div className="flex items-center gap-6 w-full justify-center">
-                    {/* Speaker Button */}
+            {/* Bottom Controls */}
+            <div className="relative z-10 w-full max-w-sm mb-12">
+                <div className="flex items-center justify-center gap-8 bg-black/20 backdrop-blur-lg p-6 rounded-3xl border border-white/5">
+                    {/* Speaker */}
                     <button
                         onClick={toggleSpeaker}
                         disabled={callStatus !== 'connected'}
-                        className={`p-4 rounded-full transition-all duration-300 flex flex-col items-center gap-1 group ${isSpeakerOn
-                            ? 'bg-white text-black hover:bg-gray-200'
-                            : 'bg-secondary/80 text-text-primary hover:bg-secondary'
-                            } ${callStatus !== 'connected' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title="Toggle Speaker"
+                        className={`p-4 rounded-full transition-all duration-200 ${isSpeakerOn
+                                ? 'bg-white text-black hover:bg-gray-200'
+                                : 'bg-white/10 text-white hover:bg-white/20'
+                            } ${callStatus !== 'connected' ? 'opacity-40' : ''}`}
                     >
-                        {isSpeakerOn ? <Volume2 size={24} /> : <VolumeX size={24} />}
+                        {isSpeakerOn ? <Volume2 size={28} /> : <VolumeX size={28} />}
                     </button>
 
-                    {/* Mute Button */}
+                    {/* Mute */}
                     <button
                         onClick={toggleMute}
                         disabled={callStatus !== 'connected'}
-                        className={`p-4 rounded-full transition-all duration-300 flex flex-col items-center gap-1 ${isMuted
-                            ? 'bg-white text-black hover:bg-gray-200'
-                            : 'bg-secondary/80 text-text-primary hover:bg-secondary'
-                            } ${callStatus !== 'connected' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title="Toggle Mute"
+                        className={`p-4 rounded-full transition-all duration-200 ${isMuted
+                                ? 'bg-white text-black hover:bg-gray-200'
+                                : 'bg-white/10 text-white hover:bg-white/20'
+                            } ${callStatus !== 'connected' ? 'opacity-40' : ''}`}
                     >
-                        {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+                        {isMuted ? <MicOff size={28} /> : <Mic size={28} />}
                     </button>
 
-                    {/* End Call Button */}
+                    {/* End Call */}
                     <button
                         onClick={() => {
                             endCall();
                             onClose();
                         }}
-                        className="p-5 rounded-full bg-destructive text-white hover:bg-destructive/90 transition-all hover:scale-105 shadow-xl shadow-destructive/30"
-                        title="End Call"
+                        className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all transform hover:scale-105 shadow-lg shadow-red-500/30"
                     >
                         <PhoneOff size={28} />
                     </button>
-
                 </div>
             </div>
         </div>

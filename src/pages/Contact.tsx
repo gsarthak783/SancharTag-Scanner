@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Phone, MessageCircle, AlertTriangle, LogOut, Car } from 'lucide-react';
+import { MessageCircle, AlertTriangle, LogOut, Car } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { MobileLayout } from '../layouts/MobileLayout';
 import { VehicleService, type VehicleDetails } from '../services/VehicleService';
-import { CallModal } from '../components/CallModal';
 import Logo from '../assets/SancharTagLogo.png';
 
 export const ContactPage: React.FC = () => {
@@ -13,7 +12,6 @@ export const ContactPage: React.FC = () => {
     const { vehicleId } = location.state || {};
     const [vehicle, setVehicle] = useState<VehicleDetails | null>(null);
     const [showEmergencyModal, setShowEmergencyModal] = useState(false);
-    const [showCallModal, setShowCallModal] = useState(false);
 
     useEffect(() => {
         if (vehicleId) {
@@ -59,19 +57,9 @@ export const ContactPage: React.FC = () => {
             </div>
 
             <div className="space-y-4 flex-1 animate-fade-in animate-delay-200">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-4">
                     <Button
                         variant="primary"
-                        size="lg"
-                        leftIcon={<Phone size={20} />}
-                        onClick={() => setShowCallModal(true)}
-                        className="h-24 flex-col gap-2 text-base shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform"
-                    >
-                        Call
-                    </Button>
-
-                    <Button
-                        variant="glass"
                         size="lg"
                         leftIcon={<MessageCircle size={20} />}
                         onClick={() => {
@@ -80,14 +68,20 @@ export const ContactPage: React.FC = () => {
                                 state: {
                                     interactionId,
                                     vehicleId,
-                                    ownerName: vehicle?.ownerName
+                                    userId: vehicle?.userId, // Pass userId explicitly
+                                    ownerName: vehicle?.ownerName,
+                                    vehicleNumber: vehicle?.vehicleNumber // Pass vehicleNumber for CallModal in Chat
                                 }
                             });
                         }}
-                        className="h-24 flex-col gap-2 text-base text-text-primary bg-white/80 border-white/50 hover:bg-white hover:-translate-y-1 transition-transform shadow-sm"
+                        className="h-16 text-lg font-semibold shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform"
                     >
-                        Chat
+                        Connect with Owner
                     </Button>
+
+                    <p className="text-center text-xs text-text-secondary px-6">
+                        Start a secure session to chat or call the vehicle owner.
+                    </p>
                 </div>
 
                 <div className="pt-6 mt-6 border-t border-border/50 space-y-3">
@@ -156,15 +150,7 @@ export const ContactPage: React.FC = () => {
                 </div>
             )}
 
-            <CallModal
-                isOpen={showCallModal}
-                onClose={() => setShowCallModal(false)}
-                userId={vehicle?.userId || ''}
-                ownerName={vehicle?.ownerName || 'Owner'}
-                vehicleNumber={vehicle?.vehicleNumber}
-                interactionId={localStorage.getItem('currentInteractionId')}
-                socketUrl="https://sanchartag-server.onrender.com"
-            />
+
         </MobileLayout>
     );
 };
